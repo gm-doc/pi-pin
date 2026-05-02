@@ -106,7 +106,7 @@
       background: #181818;
       border: 1px solid #3a3a3a;
       border-radius: 12px;
-      padding: 30px 40px 26px;
+      padding: 22px 28px 18px;
       text-align: center;
       color: white;
       min-width: 360px;
@@ -121,7 +121,7 @@
     #modal .subtitle {
       font-size: 0.75rem;
       color: #666;
-      margin-bottom: 22px;
+      margin-bottom: 14px;
     }
 
     /* ── Digit scroller ── */
@@ -130,7 +130,7 @@
       align-items: center;
       justify-content: center;
       gap: 14px;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .scroll-btn {
@@ -148,45 +148,71 @@
       justify-content: center;
       flex-shrink: 0;
       -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
     }
     .scroll-btn:active { background: #2e2e2e; }
 
-    .digits-strip {
-      display: flex;
-      gap: 7px;
+    .scroll-btn.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .digits-viewport {
+      --digit-w: 40px;
+      --digit-gap: 6px;
+      --digit-step: calc(var(--digit-w) + var(--digit-gap));
+      position: relative;
+      width: calc(var(--digit-step) * 10 - var(--digit-gap));
+      height: 74px;
       padding: 6px;
       border-radius: 10px;
       background: #121212;
       border: 1px solid #2f2f2f;
+      overflow: hidden;
     }
 
-    .digit-cell {
-      width: 40px;
-      height: 62px;
-      background: #0e0e0e;
-      border: 1px solid #3d3d3d;
-      border-radius: 7px;
+    .digits-track {
+      position: absolute;
+      top: 50%;
+      left: 6px;
+      transform: translateY(-50%);
       display: flex;
-      align-items: center;
-      justify-content: center;
+      gap: 6px;
+      will-change: transform;
+      user-select: none;
+    }
+
+    .track-digit {
+      width: 40px;
+      text-align: center;
       font-size: 2rem;
       font-family: monospace;
       font-weight: 700;
-      color: white;
-      transition: border-color 0.12s, color 0.12s, background 0.12s;
+      line-height: 62px;
+      color: #ececec;
+      text-shadow: 0 0 10px rgba(255,255,255,0.08);
     }
 
-    .digit-cell.in-selection {
-      border-color: #808080;
-      background: #181818;
+    .selection-overlay {
+      position: absolute;
+      top: 6px;
+      left: calc(6px + (var(--digit-step) * 3));
+      width: calc(var(--digit-step) * 4 - var(--digit-gap));
+      height: 62px;
+      display: flex;
+      gap: 6px;
+      pointer-events: none;
     }
 
-    .pi-label {
-      font-size: 0.7rem;
-      color: #444;
-      margin-bottom: 20px;
-      font-family: monospace;
-      letter-spacing: 0.05em;
+    .selection-cell {
+      width: 40px;
+      height: 62px;
+      border: 1px solid #7a7a7a;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.04);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
     }
 
     /* ── Modal buttons ── */
@@ -198,7 +224,7 @@
 
     #status-text {
       min-height: 18px;
-      margin: 2px 0 12px;
+      margin: 0 0 8px;
       font-size: 0.8rem;
       color: #d26f6f;
       opacity: 0;
@@ -252,23 +278,18 @@
         <div class="subtitle">Scroll through the digits of π to find your 4-digit code</div>
 
         <div class="digit-row">
-          <button class="scroll-btn" id="btn-left">&#9664;</button>
-          <div class="digits-strip" id="digits-display">
-            <div class="digit-cell" id="d0">3</div>
-            <div class="digit-cell" id="d1">1</div>
-            <div class="digit-cell" id="d2">4</div>
-            <div class="digit-cell" id="d3">1</div>
-            <div class="digit-cell" id="d4">5</div>
-            <div class="digit-cell" id="d5">9</div>
-            <div class="digit-cell" id="d6">2</div>
-            <div class="digit-cell" id="d7">6</div>
-            <div class="digit-cell" id="d8">5</div>
-            <div class="digit-cell" id="d9">3</div>
+          <button class="scroll-btn disabled" id="btn-left" aria-disabled="true">&#9664;</button>
+          <div class="digits-viewport" id="digits-viewport">
+            <div class="digits-track" id="digits-track"></div>
+            <div class="selection-overlay" aria-hidden="true">
+              <div class="selection-cell"></div>
+              <div class="selection-cell"></div>
+              <div class="selection-cell"></div>
+              <div class="selection-cell"></div>
+            </div>
           </div>
           <button class="scroll-btn" id="btn-right">&#9654;</button>
         </div>
-
-        <div class="pi-label">π = 3.14159265358979…</div>
 
         <div id="status-text" aria-live="polite"></div>
 
@@ -288,8 +309,16 @@
     const PI = '314159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009';
     const PI_LEN = PI.length;
 
+    // Gameplay options
+    const PIN_MIN_POSITION = 200;
+    const PIN_MAX_POSITION = 800;
+    const PAUSE_ON_PIN_DISPLAY_POPUP = true;
+    const PAUSE_ON_PIN_SELECTION_POPUP = true;
+    const MAX_SCROLL_SPEED_DIGITS_PER_SEC = 10;
+
     let pin = '';
-    let scrollPos = 0;
+    let selectedIndex = 0;
+    let renderedIndex = 0;
 
     // Scroll hold state
     let scrollDir = 0;
@@ -298,54 +327,97 @@
     let lastTs = 0;
     let rafId = null;
     let adRunning = false;
+    let pauseRequestedByOverlay = false;
 
     const skipBtn        = document.getElementById('skip');
     const pinToast       = document.getElementById('pin-toast');
     const toastPin       = document.getElementById('toast-pin');
     const pinDismiss     = document.getElementById('pin-dismiss');
     const modalBackdrop  = document.getElementById('modal-backdrop');
+    const digitsTrack    = document.getElementById('digits-track');
     const btnLeft        = document.getElementById('btn-left');
     const btnRight       = document.getElementById('btn-right');
     const confirmBtn     = document.getElementById('confirm-btn');
     const cancelBtn      = document.getElementById('cancel-btn');
     const statusText     = document.getElementById('status-text');
-    const digitCells     = Array.from({ length: 10 }, (_, i) => document.getElementById('d' + i));
-    const CENTER_SELECTION_START = 3;
+    const DIGIT_STEP = 46; // 40px cell + 6px gap
+    const OVERLAY_START = 3;
     const SELECTION_LEN = 4;
-    const STRIP_LEN = 10;
+    const MAX_INDEX = PI_LEN - SELECTION_LEN;
 
-    let selectionStart = 0;
     let movedDuringPress = false;
     let suppressNextClick = false;
+    let animationFrame = null;
 
-    function getStripAt(pos) {
-      const p = ((pos % PI_LEN) + PI_LEN) % PI_LEN;
-      return Array.from({ length: STRIP_LEN }, (_, i) => PI[(p + i) % PI_LEN]);
+    function setVideoPauseState(shouldPause) {
+      if (shouldPause && !pauseRequestedByOverlay) {
+        window.top.postMessage({ type: 'pause' }, '*');
+        pauseRequestedByOverlay = true;
+      } else if (!shouldPause && pauseRequestedByOverlay) {
+        window.top.postMessage({ type: 'play' }, '*');
+        pauseRequestedByOverlay = false;
+      }
     }
 
-    function stepScroll(dir) {
-      if (dir > 0) {
-        if (selectionStart < CENTER_SELECTION_START) {
-          selectionStart += 1;
-        } else {
-          scrollPos = ((scrollPos + 1) % PI_LEN + PI_LEN) % PI_LEN;
-        }
+    function syncVideoPauseState() {
+      const pinDisplayVisible = pinToast.style.display === 'block';
+      const pinSelectionVisible = modalBackdrop.classList.contains('visible');
+      const shouldPause =
+        (PAUSE_ON_PIN_DISPLAY_POPUP && pinDisplayVisible) ||
+        (PAUSE_ON_PIN_SELECTION_POPUP && pinSelectionVisible);
+      setVideoPauseState(shouldPause);
+    }
+
+    function buildTrack() {
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < PI_LEN; i++) {
+        const span = document.createElement('span');
+        span.className = 'track-digit';
+        span.textContent = PI[i];
+        frag.appendChild(span);
+      }
+      digitsTrack.appendChild(frag);
+    }
+
+    function updateTrackTransform() {
+      const x = (OVERLAY_START - renderedIndex) * DIGIT_STEP;
+      digitsTrack.style.transform = 'translate3d(' + x.toFixed(3) + 'px, -50%, 0)';
+    }
+
+    function animateToTarget() {
+      const diff = selectedIndex - renderedIndex;
+      if (Math.abs(diff) < 0.01) {
+        renderedIndex = selectedIndex;
+        updateTrackTransform();
+        animationFrame = null;
         return;
       }
 
-      if (selectionStart > 0) {
-        selectionStart -= 1;
-      } else {
-        scrollPos = ((scrollPos - 1) % PI_LEN + PI_LEN) % PI_LEN;
-      }
+      renderedIndex += diff * 0.35;
+      updateTrackTransform();
+      animationFrame = requestAnimationFrame(animateToTarget);
     }
 
-    function updateDisplay() {
-      const stripDigits = getStripAt(scrollPos);
-      for (let i = 0; i < STRIP_LEN; i++) {
-        digitCells[i].textContent = stripDigits[i];
-        digitCells[i].classList.toggle('in-selection', i >= selectionStart && i < selectionStart + SELECTION_LEN);
-      }
+    function requestTrackAnimation() {
+      if (animationFrame !== null) return;
+      animationFrame = requestAnimationFrame(animateToTarget);
+    }
+
+    function updateArrowState() {
+      const leftDisabled = selectedIndex <= 0;
+      const rightDisabled = selectedIndex >= MAX_INDEX;
+      btnLeft.classList.toggle('disabled', leftDisabled);
+      btnRight.classList.toggle('disabled', rightDisabled);
+      btnLeft.setAttribute('aria-disabled', leftDisabled ? 'true' : 'false');
+      btnRight.setAttribute('aria-disabled', rightDisabled ? 'true' : 'false');
+    }
+
+    function stepBy(dir) {
+      if (dir < 0 && selectedIndex <= 0) return;
+      if (dir > 0 && selectedIndex >= MAX_INDEX) return;
+      selectedIndex += dir;
+      updateArrowState();
+      requestTrackAnimation();
     }
 
     function showStatus(message) {
@@ -359,14 +431,13 @@
       const dt = Math.min((now - lastTs) / 1000, 0.1); // cap dt to avoid jumps
       lastTs = now;
       const holdSecs = (now - holdStart) / 1000;
-      const speed = Math.min(2 + holdSecs * 4, 10); // 2→10 over 2 s
+      const speed = Math.min(2 + holdSecs * 4, MAX_SCROLL_SPEED_DIGITS_PER_SEC); // 2→max over 2 s
       scrollAccum += speed * dt;
       while (scrollAccum >= 1) {
         scrollAccum -= 1;
-        stepScroll(scrollDir);
+        stepBy(scrollDir);
         movedDuringPress = true;
       }
-      updateDisplay();
       rafId = requestAnimationFrame(scrollTick);
     }
 
@@ -387,6 +458,7 @@
     function addHoldListeners(btn, dir) {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
+        if (btn.classList.contains('disabled')) return;
         btn.setPointerCapture(e.pointerId);
         movedDuringPress = false;
         startScroll(dir);
@@ -409,26 +481,28 @@
           suppressNextClick = false;
           return;
         }
-        stepScroll(dir);
-        updateDisplay();
+        stepBy(dir);
       });
     }
 
-    addHoldListeners(btnLeft,  -1);
-    addHoldListeners(btnRight,  1);
+    addHoldListeners(btnLeft, -1);
+    addHoldListeners(btnRight, 1);
 
     pinDismiss.addEventListener('click', () => {
       pinToast.style.display = 'none';
+      syncVideoPauseState();
     });
 
     skipBtn.addEventListener('click', () => {
       if (pinToast.style.display === 'block') return;
       skipBtn.style.display = 'none';
-      scrollPos = 0;
-      selectionStart = 0;
+      selectedIndex = 0;
+      renderedIndex = 0;
       showStatus('');
-      updateDisplay();
+      updateTrackTransform();
+      updateArrowState();
       modalBackdrop.classList.add('visible');
+      syncVideoPauseState();
     });
 
     cancelBtn.addEventListener('click', () => {
@@ -436,12 +510,11 @@
       showStatus('');
       modalBackdrop.classList.remove('visible');
       skipBtn.style.display = 'block';
+      syncVideoPauseState();
     });
 
     confirmBtn.addEventListener('click', () => {
-      const entered = getStripAt(scrollPos)
-        .slice(selectionStart, selectionStart + SELECTION_LEN)
-        .join('');
+      const entered = PI.slice(selectedIndex, selectedIndex + SELECTION_LEN);
       if (entered !== pin) {
         showStatus('PIN incorrect');
         return;
@@ -450,6 +523,7 @@
       showStatus('');
       modalBackdrop.classList.remove('visible');
       adRunning = false;
+      setVideoPauseState(false);
       window.top.postMessage({ type: 'success' }, '*');
     });
 
@@ -460,11 +534,15 @@
       if (event.data.type === 'adStarted') {
         if (adRunning) return;
         adRunning = true;
-        const pinStart = Math.floor(Math.random() * 601) + 200;
+        const maxPinStart = PI_LEN - SELECTION_LEN;
+        const minPosition = Math.max(0, Math.min(PIN_MIN_POSITION, maxPinStart));
+        const maxPosition = Math.max(minPosition, Math.min(PIN_MAX_POSITION, maxPinStart));
+        const pinStart = Math.floor(Math.random() * (maxPosition - minPosition + 1)) + minPosition;
         pin = PI.slice(pinStart, pinStart + 4);
         toastPin.textContent = pin;
         pinToast.style.display = 'block';
         skipBtn.style.display = 'block';
+        syncVideoPauseState();
       }
 
       if (event.data.type === 'adFinished') {
@@ -474,11 +552,14 @@
         pinToast.style.display = 'none';
         stopScroll();
         modalBackdrop.classList.remove('visible');
+        setVideoPauseState(false);
         window.top.postMessage({ type: 'fail' }, '*');
       }
     });
 
-    updateDisplay();
+    buildTrack();
+    updateArrowState();
+    updateTrackTransform();
 
   })(window, document);
   </script>
