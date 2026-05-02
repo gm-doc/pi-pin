@@ -351,10 +351,10 @@
 
     function setVideoPauseState(shouldPause) {
       if (shouldPause && !pauseRequestedByOverlay) {
-        window.top.postMessage({ type: 'pause' }, '*');
+        window.parent.postMessage({ type: 'pause' }, '*');
         pauseRequestedByOverlay = true;
       } else if (!shouldPause && pauseRequestedByOverlay) {
-        window.top.postMessage({ type: 'play' }, '*');
+        window.parent.postMessage({ type: 'play' }, '*');
         pauseRequestedByOverlay = false;
       }
     }
@@ -524,11 +524,11 @@
       modalBackdrop.classList.remove('visible');
       adRunning = false;
       setVideoPauseState(false);
-      window.top.postMessage({ type: 'success' }, '*');
+      window.parent.postMessage({ type: 'success' }, '*');
     });
 
     window.addEventListener('message', (event) => {
-      if (event.source && event.source !== window.top) return;
+      if (event.source && event.source !== window.parent) return;
       if (!event.data || !event.data.type) return;
 
       if (event.data.type === 'adStarted') {
@@ -553,7 +553,7 @@
         stopScroll();
         modalBackdrop.classList.remove('visible');
         setVideoPauseState(false);
-        window.top.postMessage({ type: 'fail' }, '*');
+        window.parent.postMessage({ type: 'fail' }, '*');
       }
     });
 
