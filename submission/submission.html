@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Joel</title>
+  <title>Pi-Pin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
 
-  <style type="text/css">
-    html,
-    body {
+    html, body {
       background: transparent;
       margin: 0;
       padding: 0;
@@ -17,68 +17,470 @@
     #overlay-container {
       width: 960px;
       height: 540px;
+      position: relative;
+      overflow: hidden;
     }
 
-    /* Your style here... (feel free to remove this example styling) */
+    /* ── Skip button ── */
     #skip {
-      display: none; /* Hidden until ad starts */
+      display: none;
       position: absolute;
       bottom: 60px;
       right: 0;
       padding: 10px 18px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid black;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid #333;
       border-right-width: 0;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       border-radius: 4px 0 0 4px;
       color: white;
       cursor: pointer;
     }
+
+    /* ── PIN toast ── */
+    #pin-toast {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15,15,15,0.96);
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 28px 40px;
+      text-align: center;
+      color: white;
+      z-index: 10;
+      min-width: 280px;
+    }
+
+    #pin-toast h2 {
+      margin: 0 0 4px;
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    #pin-toast .pin-digits {
+      font-size: 3.4rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      color: #fff;
+      margin: 10px 0;
+      font-family: monospace;
+    }
+
+    #pin-toast .pin-note {
+      font-size: 0.75rem;
+      color: #777;
+      margin-top: 4px;
+    }
+
+    #pin-dismiss {
+      margin-top: 18px;
+      padding: 7px 24px;
+      background: #2a2a2a;
+      border: 1px solid #555;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    #pin-dismiss:hover { background: #333; }
+
+    /* ── Modal backdrop ── */
+    #modal-backdrop {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      z-index: 20;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-backdrop.visible { display: flex; }
+
+    #modal {
+      background: #181818;
+      border: 1px solid #3a3a3a;
+      border-radius: 12px;
+      padding: 30px 40px 26px;
+      text-align: center;
+      color: white;
+      min-width: 360px;
+    }
+
+    #modal h2 {
+      margin: 0 0 4px;
+      font-size: 1.15rem;
+      font-weight: 500;
+    }
+
+    #modal .subtitle {
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 22px;
+    }
+
+    /* ── Digit scroller ── */
+    .digit-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+
+    .scroll-btn {
+      width: 42px;
+      height: 60px;
+      background: #232323;
+      border: 1px solid #484848;
+      border-radius: 7px;
+      color: #ccc;
+      font-size: 1.3rem;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      -webkit-user-select: none;
+    }
+    .scroll-btn:active { background: #2e2e2e; }
+
+    .digits-strip {
+      display: flex;
+      gap: 7px;
+      padding: 6px;
+      border-radius: 10px;
+      background: #121212;
+      border: 1px solid #2f2f2f;
+    }
+
+    .digit-cell {
+      width: 40px;
+      height: 62px;
+      background: #0e0e0e;
+      border: 1px solid #3d3d3d;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-family: monospace;
+      font-weight: 700;
+      color: white;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+
+    .digit-cell.in-selection {
+      border-color: #808080;
+      background: #181818;
+    }
+
+    .pi-label {
+      font-size: 0.7rem;
+      color: #444;
+      margin-bottom: 20px;
+      font-family: monospace;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Modal buttons ── */
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    #status-text {
+      min-height: 18px;
+      margin: 2px 0 12px;
+      font-size: 0.8rem;
+      color: #d26f6f;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    #status-text.show {
+      opacity: 1;
+    }
+
+    #confirm-btn {
+      padding: 9px 26px;
+      background: #1f4f1f;
+      border: 1px solid #3e7f3e;
+      border-radius: 6px;
+      color: white;
+      font-size: 0.95rem;
+      cursor: pointer;
+      opacity: 1;
+      transition: opacity 0.15s, color 0.15s;
+    }
+    #cancel-btn {
+      padding: 9px 26px;
+      background: #242424;
+      border: 1px solid #484848;
+      border-radius: 6px;
+      color: #999;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    #cancel-btn:hover { background: #2c2c2c; }
   </style>
 </head>
 
 <body>
   <div id="overlay-container">
-    <!-- We've added a sample button. Feel free to remove it: -->
-    <button id="skip">
-      Skip Ad...
-    </button>
+
+    <button id="skip">Skip Ad ▶</button>
+
+    <!-- Shown when ad starts with the PIN the user must remember -->
+    <div id="pin-toast">
+      <h2>Your skip code</h2>
+      <div class="pin-digits" id="toast-pin">----</div>
+      <div class="pin-note">You'll need this to skip the ad</div>
+      <button id="pin-dismiss">Got it</button>
+    </div>
+
+    <!-- Modal: scroll through π to find your PIN -->
+    <div id="modal-backdrop">
+      <div id="modal">
+        <h2>Enter Skip Code</h2>
+        <div class="subtitle">Scroll through the digits of π to find your 4-digit code</div>
+
+        <div class="digit-row">
+          <button class="scroll-btn" id="btn-left">&#9664;</button>
+          <div class="digits-strip" id="digits-display">
+            <div class="digit-cell" id="d0">3</div>
+            <div class="digit-cell" id="d1">1</div>
+            <div class="digit-cell" id="d2">4</div>
+            <div class="digit-cell" id="d3">1</div>
+            <div class="digit-cell" id="d4">5</div>
+            <div class="digit-cell" id="d5">9</div>
+            <div class="digit-cell" id="d6">2</div>
+            <div class="digit-cell" id="d7">6</div>
+            <div class="digit-cell" id="d8">5</div>
+            <div class="digit-cell" id="d9">3</div>
+          </div>
+          <button class="scroll-btn" id="btn-right">&#9654;</button>
+        </div>
+
+        <div class="pi-label">π = 3.14159265358979…</div>
+
+        <div id="status-text" aria-live="polite"></div>
+
+        <div class="modal-buttons">
+          <button id="cancel-btn">Cancel</button>
+          <button id="confirm-btn">Confirm</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <script type="text/javascript">
-    (function(window, document){
-      // This is how you tell the parent window that the ad was successfully skipped.
-      function adSuccess() {
-        window.top.postMessage({ type: 'success' }, '*');
+  <script>
+  (function(window, document) {
+
+    // 2001 digits of π (leading 3 + 2000 decimal digits), decimal point stripped
+    const PI = '314159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009';
+    const PI_LEN = PI.length;
+
+    let pin = '';
+    let scrollPos = 0;
+
+    // Scroll hold state
+    let scrollDir = 0;
+    let holdStart = 0;
+    let scrollAccum = 0;
+    let lastTs = 0;
+    let rafId = null;
+    let adRunning = false;
+
+    const skipBtn        = document.getElementById('skip');
+    const pinToast       = document.getElementById('pin-toast');
+    const toastPin       = document.getElementById('toast-pin');
+    const pinDismiss     = document.getElementById('pin-dismiss');
+    const modalBackdrop  = document.getElementById('modal-backdrop');
+    const btnLeft        = document.getElementById('btn-left');
+    const btnRight       = document.getElementById('btn-right');
+    const confirmBtn     = document.getElementById('confirm-btn');
+    const cancelBtn      = document.getElementById('cancel-btn');
+    const statusText     = document.getElementById('status-text');
+    const digitCells     = Array.from({ length: 10 }, (_, i) => document.getElementById('d' + i));
+    const CENTER_SELECTION_START = 3;
+    const SELECTION_LEN = 4;
+    const STRIP_LEN = 10;
+
+    let selectionStart = 0;
+    let movedDuringPress = false;
+    let suppressNextClick = false;
+
+    function getStripAt(pos) {
+      const p = ((pos % PI_LEN) + PI_LEN) % PI_LEN;
+      return Array.from({ length: STRIP_LEN }, (_, i) => PI[(p + i) % PI_LEN]);
+    }
+
+    function stepScroll(dir) {
+      if (dir > 0) {
+        if (selectionStart < CENTER_SELECTION_START) {
+          selectionStart += 1;
+        } else {
+          scrollPos = ((scrollPos + 1) % PI_LEN + PI_LEN) % PI_LEN;
+        }
+        return;
       }
 
-      const skipButton = document.getElementById('skip');
+      if (selectionStart > 0) {
+        selectionStart -= 1;
+      } else {
+        scrollPos = ((scrollPos - 1) % PI_LEN + PI_LEN) % PI_LEN;
+      }
+    }
 
-      // Listen for messages from the game shell
-      window.addEventListener('message', (event) => {
-        if (!event.data || !event.data.type) return;
+    function updateDisplay() {
+      const stripDigits = getStripAt(scrollPos);
+      for (let i = 0; i < STRIP_LEN; i++) {
+        digitCells[i].textContent = stripDigits[i];
+        digitCells[i].classList.toggle('in-selection', i >= selectionStart && i < selectionStart + SELECTION_LEN);
+      }
+    }
 
-        if (event.data.type === 'adStarted') {
-          // Show the skip button when the ad starts
-          skipButton.style.display = 'block';
-        }
+    function showStatus(message) {
+      statusText.textContent = message;
+      statusText.classList.toggle('show', !!message);
+    }
 
-        // By default, if the user doesn't "skip" the ad before the video ends,
-        // we call fail to restart. You're welcome to replace this with a survey
-        // or other interaction instead (see examples/survey).
-        if (event.data.type === 'adFinished') {
-          skipButton.style.display = 'none';
-          window.top.postMessage({ type: 'fail' }, '*');
-        }
+    // RAF-based scroll: 2 digits/sec initially, ramps to 10/sec over 2 s of holding
+    function scrollTick(now) {
+      if (scrollDir === 0) { rafId = null; return; }
+      const dt = Math.min((now - lastTs) / 1000, 0.1); // cap dt to avoid jumps
+      lastTs = now;
+      const holdSecs = (now - holdStart) / 1000;
+      const speed = Math.min(2 + holdSecs * 4, 10); // 2→10 over 2 s
+      scrollAccum += speed * dt;
+      while (scrollAccum >= 1) {
+        scrollAccum -= 1;
+        stepScroll(scrollDir);
+        movedDuringPress = true;
+      }
+      updateDisplay();
+      rafId = requestAnimationFrame(scrollTick);
+    }
+
+    function startScroll(dir) {
+      if (scrollDir === dir) return;
+      scrollDir = dir;
+      holdStart = performance.now();
+      scrollAccum = 0;
+      lastTs = performance.now();
+      if (!rafId) rafId = requestAnimationFrame(scrollTick);
+    }
+
+    function stopScroll() {
+      scrollDir = 0;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    }
+
+    function addHoldListeners(btn, dir) {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        btn.setPointerCapture(e.pointerId);
+        movedDuringPress = false;
+        startScroll(dir);
       });
-
-      // Your ad overlay code goes here, we've added a simple example below:
-      skipButton.addEventListener('click', () => {
-        skipButton.style.display = 'none';
-        adSuccess();
+      btn.addEventListener('pointerup', () => {
+        stopScroll();
+        suppressNextClick = movedDuringPress;
       });
+      btn.addEventListener('pointercancel', () => {
+        stopScroll();
+        suppressNextClick = movedDuringPress;
+      });
+      btn.addEventListener('lostpointercapture', () => {
+        stopScroll();
+        suppressNextClick = movedDuringPress;
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (suppressNextClick) {
+          suppressNextClick = false;
+          return;
+        }
+        stepScroll(dir);
+        updateDisplay();
+      });
+    }
 
-    })(window, document);
+    addHoldListeners(btnLeft,  -1);
+    addHoldListeners(btnRight,  1);
+
+    pinDismiss.addEventListener('click', () => {
+      pinToast.style.display = 'none';
+    });
+
+    skipBtn.addEventListener('click', () => {
+      if (pinToast.style.display === 'block') return;
+      skipBtn.style.display = 'none';
+      scrollPos = 0;
+      selectionStart = 0;
+      showStatus('');
+      updateDisplay();
+      modalBackdrop.classList.add('visible');
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      stopScroll();
+      showStatus('');
+      modalBackdrop.classList.remove('visible');
+      skipBtn.style.display = 'block';
+    });
+
+    confirmBtn.addEventListener('click', () => {
+      const entered = getStripAt(scrollPos)
+        .slice(selectionStart, selectionStart + SELECTION_LEN)
+        .join('');
+      if (entered !== pin) {
+        showStatus('PIN incorrect');
+        return;
+      }
+      stopScroll();
+      showStatus('');
+      modalBackdrop.classList.remove('visible');
+      adRunning = false;
+      window.top.postMessage({ type: 'success' }, '*');
+    });
+
+    window.addEventListener('message', (event) => {
+      if (event.source && event.source !== window.top) return;
+      if (!event.data || !event.data.type) return;
+
+      if (event.data.type === 'adStarted') {
+        if (adRunning) return;
+        adRunning = true;
+        const pinStart = Math.floor(Math.random() * 601) + 200;
+        pin = PI.slice(pinStart, pinStart + 4);
+        toastPin.textContent = pin;
+        pinToast.style.display = 'block';
+        skipBtn.style.display = 'block';
+      }
+
+      if (event.data.type === 'adFinished') {
+        if (!adRunning) return;
+        adRunning = false;
+        skipBtn.style.display = 'none';
+        pinToast.style.display = 'none';
+        stopScroll();
+        modalBackdrop.classList.remove('visible');
+        window.top.postMessage({ type: 'fail' }, '*');
+      }
+    });
+
+    updateDisplay();
+
+  })(window, document);
   </script>
 </body>
 </html>
